@@ -232,26 +232,19 @@ function [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathT
     waitTime = zeros(1, length(distanceArray) + 1);
 
     currentTime = 0;
-
-    for i = 1:length(typeOfPath)
-        % ---------- 先加“进入本段前”的中转时间 ----------
-        if i > 1
-            transferTime = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
-            currentTime = currentTime + transferTime;
-        end
-        % -----------------------------------------------
-
+    for i = 1: length(typeOfPath)
         type = typeOfPath(i);
         startTimeOfTransport = model.startTimeOfTransportType(type);
         endTimeOfTransport = model.endTimeOfTransportType(type);
         intervalTimeOfTransport = model.intervalTimeOfTransportType(type);
-
-        startTime = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);
+        [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);
         waitTime(i) = startTime - currentTime;
         arriveTime(i + 1) = startTime + travelTime(i);
-
-        % 当前时间推进到本段到达时刻
-        currentTime = arriveTime(i + 1);
+        transferTime = 0;
+        if i > 1
+            transferTime = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
+        end
+        currentTime = arriveTime(i + 1) + transferTime;
     end
 end
 
@@ -360,20 +353,37 @@ function [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTi
 end
 
 % 双目标：加权综合经济成本、加权总碳排放
-function [individualObjs] = getIndividualObjs(individual, model)
+function [individualObjs, detail] = getIndividualObjs(individual, model)
     scenarioQ = model.fuzzyQ;
     scenarioW = model.fuzzyW;
 
     scenarioCost = zeros(1, length(scenarioQ));
     scenarioEmission = zeros(1, length(scenarioQ));
+    scenarioArriveTime = zeros(1, length(scenarioQ));
 
     penaltyValue = model.penaltyFactor;
-    for i = 1: length(scenarioQ)
+
+    detail = struct();
+    detail.scenarioQ = scenarioQ;
+    detail.scenarioW = scenarioW;
+    detail.scenarioCost = [];
+    detail.scenarioEmission = [];
+    detail.scenarioArriveTime = [];
+    detail.path = [];
+    detail.typeOfPath = [];
+
+    for i = 1:length(scenarioQ)
         Q = scenarioQ(i);
-        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, ~, ~, ~, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
+        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTime, path, typeOfPath, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
 
         if numOfPenalty > 0 || any(~isfinite([C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total]))
             individualObjs = [1 1] * (penaltyValue + abs(distanceOfPath));
+
+            detail.scenarioCost = inf(1, length(scenarioQ));
+            detail.scenarioEmission = inf(1, length(scenarioQ));
+            detail.scenarioArriveTime = inf(1, length(scenarioQ));
+            detail.path = path;
+            detail.typeOfPath = typeOfPath;
             return;
         end
 
@@ -383,6 +393,10 @@ function [individualObjs] = getIndividualObjs(individual, model)
 
         scenarioCost(i) = C_total;
         scenarioEmission(i) = E_total;
+        scenarioArriveTime(i) = arriveTime(end);
+
+        detail.path = path;
+        detail.typeOfPath = typeOfPath;
     end
 
     F_cost = sum(scenarioW .* scenarioCost);
@@ -394,11 +408,15 @@ function [individualObjs] = getIndividualObjs(individual, model)
     end
 
     individualObjs = [F_cost, F_carbon];
+
+    detail.scenarioCost = scenarioCost;
+    detail.scenarioEmission = scenarioEmission;
+    detail.scenarioArriveTime = scenarioArriveTime;
 end
 
 function traceTimeDetail(individual, model, Q)
     [path, typeOfPath] = model.analyseIndividual(individual, model);
-    [distanceOfPath, distanceArray, numOfPenalty] = getDistanceOfPath(path, typeOfPath, model);
+    [~, distanceArray, numOfPenalty] = getDistanceOfPath(path, typeOfPath, model);
     pathTransferType = model.getPathTransferType(typeOfPath);
 
     if numOfPenalty > 0 || any(~isfinite(distanceArray))
@@ -410,15 +428,24 @@ function traceTimeDetail(individual, model, Q)
     travelTime = distanceArray ./ model.speedOfTransportType(typeOfPath);
 
     currentTime = 0;
+    finalArriveTime = 0;
+
     fprintf('\n================ 时间递推诊断：Q = %.0f ================\n', Q);
     fprintf('路径 path = %s\n', mat2str(path));
     fprintf('运输方式 typeOfPath = %s\n', mat2str(typeOfPath));
     fprintf('中转类型 pathTransferType = %s\n\n', mat2str(pathTransferType));
 
     fprintf('%4s %8s %8s %12s %12s %12s %12s %12s %12s\n', ...
-        '段号', '起点', '终点', '到段前时刻', '等待时间', '发车时刻', '行驶时间', '到达时刻', '中转时间');
+        '段号', '起点', '终点', '到段前时刻', '等待时间', '发车时刻', '行驶时间', '到达时刻', '段前中转');
 
     for i = 1:nSeg
+        % 先加进入本段前的中转时间（与 getArriveTime 保持一致）
+        transferTimeBefore = 0;
+        if i > 1
+            transferTimeBefore = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
+            currentTime = currentTime + transferTimeBefore;
+        end
+
         I = path(i);
         J = path(i+1);
         type = typeOfPath(i);
@@ -432,24 +459,20 @@ function traceTimeDetail(individual, model, Q)
         waitTime = departTime - currentTime;
         arriveTime = departTime + travelTime(i);
 
-        transferTime = 0;
-        if i < nSeg
-            transferTime = Q * model.timeOfUnitTransfer(pathTransferType(i));
-        end
-
         fprintf('%4d %8d %8d %12.2f %12.2f %12.2f %12.2f %12.2f %12.2f\n', ...
-            i, I, J, beforeTime, waitTime, departTime, travelTime(i), arriveTime, transferTime);
+            i, I, J, beforeTime, waitTime, departTime, travelTime(i), arriveTime, transferTimeBefore);
 
-        currentTime = arriveTime + transferTime;
+        currentTime = arriveTime;
+        finalArriveTime = arriveTime;
     end
 
-    fprintf('\n终点最终到达时刻 = %.2f\n', currentTime - transferTime);
+    fprintf('\n终点最终到达时刻 = %.2f\n', finalArriveTime);
     fprintf('时间窗 = [%.2f, %.2f]\n', model.TW(1), model.TW(2));
 
-    if currentTime - transferTime < model.TW(1)
-        fprintf('时间窗状态：提前 %.2f h\n', model.TW(1) - (currentTime - transferTime));
-    elseif currentTime - transferTime > model.TW(2)
-        fprintf('时间窗状态：延误 %.2f h\n', (currentTime - transferTime) - model.TW(2));
+    if finalArriveTime < model.TW(1)
+        fprintf('时间窗状态：提前 %.2f h\n', model.TW(1) - finalArriveTime);
+    elseif finalArriveTime > model.TW(2)
+        fprintf('时间窗状态：延误 %.2f h\n', finalArriveTime - model.TW(2));
     else
         fprintf('时间窗状态：落在时间窗内\n');
     end
@@ -513,10 +536,17 @@ function printIndividual(individual, model)
     end
 
     [individualObjs] = getIndividualObjs(individual, model);
+    pathTransferType = model.getPathTransferType(typeOfPath);
+    numTransfers = sum(pathTransferType > 1);
+    numModeChanges = sum(typeOfPath(1:end-1) ~= typeOfPath(2:end));
+
     fprintf('加权综合经济成本 F_cost: %.2f\n', individualObjs(1));
     fprintf('加权总碳排放量 F_carbon: %.2f\n', individualObjs(2));
     fprintf('路径序列 path: %s\n', mat2str(path));
     fprintf('运输方式序列 typeOfPath: %s\n', mat2str(typeOfPath));
+    fprintf('中转类型 pathTransferType: %s\n', mat2str(pathTransferType));
+    fprintf('中转次数（不含"不中转"）: %d\n', numTransfers);
+    fprintf('运输方式变化次数: %d\n', numModeChanges);
     fprintf('各情景到达时间: %s\n', mat2str(scenarioArriveTime, 6));
 end
 
@@ -637,5 +667,6 @@ function flag = isPathFeasible(path, model)
         end
     end
 end
+
 
 
