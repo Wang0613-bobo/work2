@@ -6,8 +6,8 @@ function [model] = initModel(fileName)
     model.endPointId = 20;                                                  % 终点id（成都）
 
     % 货量设置：quantityOfCargo仅作为兼容字段/最可能货量展示值
-    model.quantityOfCargo = 10000;                                          % 兼容字段（最可能货量）, t
-    model.fuzzyQ = [8000 10000 12000];                                      % 三角模糊需求场景, t
+    model.quantityOfCargo = 1000;                                           % 兼容字段（最可能货量）, t
+    model.fuzzyQ = [800 1000 1200];                                         % 三角模糊需求场景, t
     model.fuzzyW = [0.25 0.50 0.25];                                        % 三场景权重
 
     model.TW = [60 100];                                                    % 时间窗, h
