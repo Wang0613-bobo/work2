@@ -114,28 +114,77 @@ function [newArray] = removeX(originalArray, elementToRemove)
 end
 
 function [individualPart1] = initIndividualPart1(model)
-    [sequence] = model.sequence;
-    individualPart1 = sequence(randperm(length(sequence)));
+    path = generateFeasiblePath(model);                                          % 含起点和终点
+    usedNodes = path(2:end);                                                     % 染色体中不含起点
+    restNodes = setdiff(model.sequence, usedNodes, 'stable');
+
+    if ~isempty(restNodes)
+        restNodes = restNodes(randperm(length(restNodes)));
+    end
+
+    individualPart1 = [usedNodes, restNodes];
 end
 
-function [individualPart2] = initIndividualPart2(model)
-    individualPart2 = round(rand(1, model.numOfDecVariablesPart2) .* (model.upper2 - model.lower2) + model.lower2);
+function [individualPart2] = initIndividualPart2(individualPart1, model)
+    path = getPath(individualPart1, model);
+    individualPart2 = ones(1, model.numOfDecVariablesPart2);
+
+    for i = 1:length(path)-1
+        I = path(i);
+        J = path(i+1);
+        availableTypes = find(isfinite(squeeze(model.distanceMat3D(I, J, :))));
+        if isempty(availableTypes)
+            individualPart2(i) = 1;
+        else
+            individualPart2(i) = availableTypes(randi(length(availableTypes)));
+        end
+    end
+
+    if length(path)-1 < model.numOfDecVariablesPart2
+        tailLen = model.numOfDecVariablesPart2 - (length(path)-1);
+        individualPart2(length(path):end) = randi(model.numOfTransportType, 1, tailLen);
+    end
 end
 
 function [individual] = initIndividual(model)
-    [individualPart1] = initIndividualPart1(model);
-    [individualPart2] = initIndividualPart2(model);
+    individualPart1 = initIndividualPart1(model);
+    individualPart2 = initIndividualPart2(individualPart1, model);
     individual = [individualPart1 individualPart2];
 end
 
 function [path, typeOfPath] = analyseIndividual(individual, model)
-    individualPart1 = individual(1: model.numOfDecVariablesPart1);
-    individualPart2 = individual(1 + model.numOfDecVariablesPart1: end);
+    individualPart1 = individual(1:model.numOfDecVariablesPart1);
+    individualPart2 = individual(1 + model.numOfDecVariablesPart1:end);
 
-    [individualPart2] = repairIndividualPart2(individualPart2, model);
+    individualPart2 = repairIndividualPart2(individualPart2, model);
 
     path = getPath(individualPart1, model);
-    typeOfPath = individualPart2(1: length(path) - 1);
+
+                                                                                % 如果路径中存在不可达弧段，则直接重构一条可行路径
+    if ~isPathFeasible(path, model)
+        path = generateFeasiblePath(model);
+        usedNodes = path(2:end);
+        restNodes = setdiff(model.sequence, usedNodes, 'stable');
+        if ~isempty(restNodes)
+            restNodes = restNodes(randperm(length(restNodes)));
+        end
+        individualPart1 = [usedNodes, restNodes];
+        path = getPath(individualPart1, model);
+    end
+
+    typeOfPath = individualPart2(1:length(path)-1);
+
+                                                                                % 如果某一段运输方式不可用，则替换成该段可用方式
+    for i = 1:length(path)-1
+        I = path(i);
+        J = path(i+1);
+        if ~isfinite(model.distanceMat3D(I, J, typeOfPath(i)))
+            availableTypes = find(isfinite(squeeze(model.distanceMat3D(I, J, :))));
+            if ~isempty(availableTypes)
+                typeOfPath(i) = availableTypes(randi(length(availableTypes)));
+            end
+        end
+    end
 end
 
 function [path] = getPath(individualPart1, model)
@@ -198,9 +247,15 @@ function [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathT
 end
 
 function [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport)
+    if ~isfinite(currentTime)
+        startTime = inf;
+        return;
+    end
+
     if intervalTimeOfTransport == 0
         intervalTimeOfTransport = 0.01;
     end
+
     currentT = mod(currentTime, 24);
     if currentT <= startTimeOfTransport
         startTime = startTimeOfTransport;
@@ -433,8 +488,52 @@ function showIndividual(individual, model)
     plot(G, 'NodeLabel', nodeLabel, 'EdgeLabel', edgeLabel, 'EdgeColor', edgeColor, 'LineWidth', 2);
 end
 
+function path = generateFeasiblePath(model)
+    maxRetry = 200;
 
+    for trial = 1:maxRetry
+        current = model.startPointId;
+        path = current;
+        visited = false(1, model.numOfVertex);
+        visited(current) = true;
 
+        while current ~= model.endPointId
+            outNodes = find(isfinite(model.adjacencyMatrix(current, :)) & model.adjacencyMatrix(current, :) > 0);
 
+            feasibleNext = [];
+            for k = 1:length(outNodes)
+                nxt = outNodes(k);
+                if ~visited(nxt) && isfinite(model.distanceMatOfAdjacency(nxt, model.endPointId))
+                    feasibleNext(end+1) = nxt; %#ok<AGROW>
+                end
+            end
+
+            if isempty(feasibleNext)
+                break;
+            end
+
+            nextNode = feasibleNext(randi(length(feasibleNext)));
+            path(end+1) = nextNode; %#ok<AGROW>
+            visited(nextNode) = true;
+            current = nextNode;
+        end
+
+        if path(end) == model.endPointId
+            return;
+        end
+    end
+
+    error('初始化失败：多次尝试后仍未生成可行路径，请检查网络连通性或初始化逻辑。');
+end
+
+function flag = isPathFeasible(path, model)
+    flag = true;
+    for i = 1:length(path)-1
+        if ~isfinite(model.adjacencyMatrix(path(i), path(i+1))) || model.adjacencyMatrix(path(i), path(i+1)) <= 0
+            flag = false;
+            return;
+        end
+    end
+end
 
 
