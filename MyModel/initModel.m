@@ -232,20 +232,41 @@ function [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathT
     waitTime = zeros(1, length(distanceArray) + 1);
 
     currentTime = 0;
-    for i = 1: length(typeOfPath)
+
+    for i = 1:length(typeOfPath)
+        if i > 1
+            transferTime = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
+            currentTime = currentTime + transferTime;
+        end
+
         type = typeOfPath(i);
         startTimeOfTransport = model.startTimeOfTransportType(type);
         endTimeOfTransport = model.endTimeOfTransportType(type);
         intervalTimeOfTransport = model.intervalTimeOfTransportType(type);
-        [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);
+
+        startTime = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);
         waitTime(i) = startTime - currentTime;
         arriveTime(i + 1) = startTime + travelTime(i);
-        transferTime = 0;
-        if i > 1
-            transferTime = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
-        end
-        currentTime = arriveTime(i + 1) + transferTime;
+
+        currentTime = arriveTime(i + 1);
     end
+end
+
+function [arriveTime, waitTime, travelTime, transferTimeList, totalTravelTime, totalWaitTime, totalTransferTime] = ...
+    getTimeBreakdown(distanceArray, typeOfPath, pathTransferType, model, Q)
+
+    [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathTransferType, model, Q);
+
+    travelTime = distanceArray ./ model.speedOfTransportType(typeOfPath);
+
+    transferTimeList = zeros(1, length(pathTransferType));
+    for k = 1:length(pathTransferType)
+        transferTimeList(k) = Q * model.timeOfUnitTransfer(pathTransferType(k));
+    end
+
+    totalTravelTime = sum(travelTime);
+    totalWaitTime = sum(waitTime(1:length(typeOfPath)));
+    totalTransferTime = sum(transferTimeList);
 end
 
 function [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport)
@@ -424,11 +445,11 @@ function traceTimeDetail(individual, model, Q)
         return;
     end
 
-    nSeg = length(typeOfPath);
-    travelTime = distanceArray ./ model.speedOfTransportType(typeOfPath);
+    [arriveTime, waitTime, travelTime, transferTimeList, totalTravelTime, totalWaitTime, totalTransferTime] = ...
+        getTimeBreakdown(distanceArray, typeOfPath, pathTransferType, model, Q);
 
+    nSeg = length(typeOfPath);
     currentTime = 0;
-    finalArriveTime = 0;
 
     fprintf('\n================ 时间递推诊断：Q = %.0f ================\n', Q);
     fprintf('路径 path = %s\n', mat2str(path));
@@ -439,40 +460,31 @@ function traceTimeDetail(individual, model, Q)
         '段号', '起点', '终点', '到段前时刻', '等待时间', '发车时刻', '行驶时间', '到达时刻', '段前中转');
 
     for i = 1:nSeg
-        % 先加进入本段前的中转时间（与 getArriveTime 保持一致）
         transferTimeBefore = 0;
         if i > 1
-            transferTimeBefore = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
+            transferTimeBefore = transferTimeList(i - 1);
             currentTime = currentTime + transferTimeBefore;
         end
 
-        I = path(i);
-        J = path(i+1);
-        type = typeOfPath(i);
-
-        startTimeOfTransport = model.startTimeOfTransportType(type);
-        endTimeOfTransport = model.endTimeOfTransportType(type);
-        intervalTimeOfTransport = model.intervalTimeOfTransportType(type);
-
         beforeTime = currentTime;
-        departTime = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);
-        waitTime = departTime - currentTime;
-        arriveTime = departTime + travelTime(i);
+        departTime = currentTime + waitTime(i);
 
         fprintf('%4d %8d %8d %12.2f %12.2f %12.2f %12.2f %12.2f %12.2f\n', ...
-            i, I, J, beforeTime, waitTime, departTime, travelTime(i), arriveTime, transferTimeBefore);
+            i, path(i), path(i+1), beforeTime, waitTime(i), departTime, travelTime(i), arriveTime(i+1), transferTimeBefore);
 
-        currentTime = arriveTime;
-        finalArriveTime = arriveTime;
+        currentTime = arriveTime(i+1);
     end
 
-    fprintf('\n终点最终到达时刻 = %.2f\n', finalArriveTime);
+    fprintf('\n总运输行驶时间 = %.2f\n', totalTravelTime);
+    fprintf('总等待时间     = %.2f\n', totalWaitTime);
+    fprintf('总中转时间     = %.2f\n', totalTransferTime);
+    fprintf('终点最终到达时刻 = %.2f\n', arriveTime(end));
     fprintf('时间窗 = [%.2f, %.2f]\n', model.TW(1), model.TW(2));
 
-    if finalArriveTime < model.TW(1)
-        fprintf('时间窗状态：提前 %.2f h\n', model.TW(1) - finalArriveTime);
-    elseif finalArriveTime > model.TW(2)
-        fprintf('时间窗状态：延误 %.2f h\n', finalArriveTime - model.TW(2));
+    if arriveTime(end) < model.TW(1)
+        fprintf('时间窗状态：提前 %.2f h\n', model.TW(1) - arriveTime(end));
+    elseif arriveTime(end) > model.TW(2)
+        fprintf('时间窗状态：延误 %.2f h\n', arriveTime(end) - model.TW(2));
     else
         fprintf('时间窗状态：落在时间窗内\n');
     end
@@ -491,7 +503,7 @@ function printIndividual(individual, model)
     for i = 1:length(scenarioQ)
         Q = scenarioQ(i);
 
-        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTime, path, typeOfPath, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
+        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, ~, path, typeOfPath, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
 
         if numOfPenalty > 0 || any(~isfinite([C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total]))
             hasPenalty = true;
@@ -499,22 +511,13 @@ function printIndividual(individual, model)
             break;
         end
 
-        % ---------- 新增：拆解时间 ----------
+        % ===== 用当前版本的 getArriveTime 重新统一计算时间 =====
         [~, distanceArray, ~] = model.getDistanceOfPath(path, typeOfPath, model);
         pathTransferType = model.getPathTransferType(typeOfPath);
-        [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathTransferType, model, Q);
 
-        travelTime = distanceArray ./ model.speedOfTransportType(typeOfPath);
-
-        transferTimeList = zeros(1, length(pathTransferType));
-        for k = 1:length(pathTransferType)
-            transferTimeList(k) = Q * model.timeOfUnitTransfer(pathTransferType(k));
-        end
-
-        totalTravelTime = sum(travelTime);
-        totalWaitTime = sum(waitTime(1:length(typeOfPath)));
-        totalTransferTime = sum(transferTimeList);
-        % -----------------------------------
+        [arriveTime2, waitTime, travelTime, transferTimeList, totalTravelTime, totalWaitTime, totalTransferTime] = ...
+            getTimeBreakdown(distanceArray, typeOfPath, pathTransferType, model, Q);
+        % ======================================================
 
         C_base = C_wait + C_trans + C_transfer + C_timeWindow + C_damage;
         C_tax = model.carbonTax * E_total;
@@ -522,13 +525,13 @@ function printIndividual(individual, model)
 
         scenarioCost(i) = C_total;
         scenarioEmission(i) = E_total;
-        scenarioArriveTime(i) = arriveTime(end);
+        scenarioArriveTime(i) = arriveTime2(end);
 
         fprintf(['情景%d: Q=%.0f, W=%.2f, C_wait=%.2f, C_trans=%.2f, C_transfer=%.2f, ', ...
                  'C_timeWindow=%.2f, C_damage=%.2f, C_tax=%.2f, C_total=%.2f, E_total=%.2f, ', ...
                  'arriveTime=%.2f, travelTime=%.2f, waitTime=%.2f, transferTime=%.2f\n'], ...
             i, Q, scenarioW(i), C_wait, C_trans, C_transfer, C_timeWindow, C_damage, C_tax, C_total, E_total, ...
-            arriveTime(end), totalTravelTime, totalWaitTime, totalTransferTime);
+            arriveTime2(end), totalTravelTime, totalWaitTime, totalTransferTime);
     end
 
     if hasPenalty
@@ -545,7 +548,7 @@ function printIndividual(individual, model)
     fprintf('路径序列 path: %s\n', mat2str(path));
     fprintf('运输方式序列 typeOfPath: %s\n', mat2str(typeOfPath));
     fprintf('中转类型 pathTransferType: %s\n', mat2str(pathTransferType));
-    fprintf('中转次数（不含"不中转"）: %d\n', numTransfers);
+    fprintf('中转次数（不含“不中转”）: %d\n', numTransfers);
     fprintf('运输方式变化次数: %d\n', numModeChanges);
     fprintf('各情景到达时间: %s\n', mat2str(scenarioArriveTime, 6));
 end
