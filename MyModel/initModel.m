@@ -1,61 +1,69 @@
 function [model] = initModel(fileName)
     data = load(fileName);
     data = updateData(data);
-    
-	model.startPointId = 1;                                                 % Æğµãid
-    model.endPointId = 19;                                                  % ÖÕµãid
-    model.quantityOfCargo = 1000;                                           % »õÎïÁ¿,t
-    model.TW = [60 100];                                                     % Ê±¼ä´°,h
-    model.costOfUnitWait = [0 8 8];                                         % ¹«Â·¡¢ÌúÂ·¡¢Ë®Â·µÄµ¥Î»µÈ´ı³É±¾,Ôª/(h*t)
-    model.speedOfTransportType = [80 60 30];                                % ²»Í¬ÔËÊä·½Ê½µÄËÙ¶È,km/h
-    model.costOfUnitTransport = [0.526 0.392 0.09];                         % ²»Í¬ÔËÊä·½Ê½µÄµ¥Î»ÔËÊä³É±¾,Ôª/(km*t)
-    model.carbonEmissionsOfUnitTransport = [0.0538 0.01 0.0128];            % ²»Í¬ÔËÊä·½Ê½µÄµ¥Î»Ì¼ÅÅ·ÅÁ¿,kg/(km*t)
-    model.startTimeOfTransportType = [0 1 1];                               % ²»Í¬ÔËÊä·½Ê½µÄ·¢°àÊ±¿Ì
-    model.endTimeOfTransportType = [24 24 24];                              % ²»Í¬ÔËÊä·½Ê½µÄÊÕ°àÊ±¿Ì
-    model.intervalTimeOfTransportType = [0 1 2];                            % ²»Í¬ÔËÊä·½Ê½µÄÃ¿°à¼ä¸ô
-    model.rateDamagedOfRansportType = [0.01 0.015 0.02] / 100;               % ²»Í¬ÔËÊä·½Ê½µÄ»õËğÂÊ£¬Ôª/t
-    model.rateDamagedOfTransferType = [0.00 0.04 0.04 0.04] / 100;           % [²»ÖĞ×ª¡¢¹«Â·-ÌúÂ·¡¢¹«Â·-Ë®Â·¡¢ÌúÂ·-Ë®Â·]µÄ»õËğÂÊ£¬Ôª/t
-    model.costOfUnitTransfer = [0 3.5 3 4];                                 % [²»ÖĞ×ª¡¢¹«Â·-ÌúÂ·¡¢¹«Â·-Ë®Â·¡¢ÌúÂ·-Ë®Â·]µ¥Î»ÖĞ×ª³É±¾,Ôª/t
-    model.timeOfUnitTransfer = [0 0.01 0.015 0.01];                         % [²»ÖĞ×ª¡¢¹«Â·-ÌúÂ·¡¢¹«Â·-Ë®Â·¡¢ÌúÂ·-Ë®Â·]µ¥Î»ÖĞ×ªÊ±¼ä,h/t
-    model.carbonEmissionsOfUnitTransfer = [0 0.5 0.8 1.0];                  % [²»ÖĞ×ª¡¢¹«Â·-ÌúÂ·¡¢¹«Â·-Ë®Â·¡¢ÌúÂ·-Ë®Â·]µ¥Î»ÖĞ×ªÌ¼ÅÅ·ÅÁ¿,kg/t
-    
-    model.price = 10000;                                                    % »õÎïµ¥Î»ÖÊÁ¿¼ÛÖµÁ¿,Ôª/t
-    model.costOfUnitCarbon = 1;                                             % µ¥Î»Ì¼ÅÅ·ÅÁ¿,1Ôª/kg
-    model.p1 = 8;                                                           % µ¥Î»Ôçµ½³Í·£,8Ôª/(h*t)
-    model.p2 = 8;                                                           % µ¥Î»Ííµ½³Í·£,20Ôª/(h*t)
-    model.penaltyFactor = 10 ^ 10;                                          % ³Í·£Òò×Ó
-    
-	model.numOfObjs = 3;                                                    % Ä¿±êÊı
-    model.weightOfObjs = [0.1 0.1 0.1];                                     % Ä¿±êÈ¨ÖØ
-    
-    model.numOfEdge = size(data, 1);                                        % ×ÜÂ·¾¶Êı
-    model.edgeSet = data(1: model.numOfEdge, 1: 2);                         % Â·¾¶
-    model.distanceTable = data(1: model.numOfEdge, 3: 5);                   % ½Úµã¼ä¸÷ÔËÊä·½Ê½µÄ¾àÀë(¹«Â·¡¢ÌúÂ·¡¢Ë®Â·)
-    model.numOfVertex = max(model.edgeSet(:));                              % ×Ü½ÚµãÊı
-    model.numOfTransportType = size(model.distanceTable, 2);                % ÔËÊä·½Ê½Êı
 
-    model.adjacencyMatrix = getAdjacencyMatrix(model.edgeSet);              % Á¬Í¨¾ØÕó
-    [model.distanceMatOfAdjacency, ~] = floyd(model.adjacencyMatrix);       % ×î¶ÌÂ·¾¶(×î¿ì¼¸²½µ½´ï)
-    [model.distanceMat3D] = getDistanceMat3D(model.edgeSet, model.distanceTable);           % ¸÷ÔËÊä·½Ê½µÄ¾àÀë¾ØÕó(¹«Â·¡¢ÌúÂ·¡¢Ë®Â·)
-    
+    model.startPointId = 1;                                                 % èµ·ç‚¹idï¼ˆä¸Šæµ·ï¼‰
+    model.endPointId = 20;                                                  % ç»ˆç‚¹idï¼ˆæˆéƒ½ï¼‰
+
+    % è´§é‡è®¾ç½®ï¼šquantityOfCargoä»…ä½œä¸ºå…¼å®¹å­—æ®µ/æœ€å¯èƒ½è´§é‡å±•ç¤ºå€¼
+    model.quantityOfCargo = 10000;                                          % å…¼å®¹å­—æ®µï¼ˆæœ€å¯èƒ½è´§é‡ï¼‰, t
+    model.fuzzyQ = [8000 10000 12000];                                      % ä¸‰è§’æ¨¡ç³Šéœ€æ±‚åœºæ™¯, t
+    model.fuzzyW = [0.25 0.50 0.25];                                        % ä¸‰åœºæ™¯æƒé‡
+
+    model.TW = [60 100];                                                    % æ—¶é—´çª—, h
+    model.costOfUnitWait = [2 1 0.2];                                       % [å…¬è·¯ é“è·¯ æ°´è·¯]å•ä½ç­‰å¾…æˆæœ¬, å…ƒ/(h*t)
+    model.speedOfTransportType = [80 60 25];                                % [å…¬è·¯ é“è·¯ æ°´è·¯]è¿è¡Œé€Ÿåº¦, km/h
+    model.costOfUnitTransport = [0.6 0.15 0.05];                            % [å…¬è·¯ é“è·¯ æ°´è·¯]å•ä½è¿è¾“æˆæœ¬, å…ƒ/(km*t)
+    model.carbonEmissionsOfUnitTransport = [0.0538 0.0099 0.0128];          % [å…¬è·¯ é“è·¯ æ°´è·¯]å•ä½è¿è¾“ç¢³æ’æ”¾, kg/(km*t)
+    model.startTimeOfTransportType = [0 8 8];                               % [å…¬è·¯ é“è·¯ æ°´è·¯]é¦–ç­æ—¶åˆ»
+    model.endTimeOfTransportType = [24 20 16];                              % [å…¬è·¯ é“è·¯ æ°´è·¯]æœ«ç­æ—¶åˆ»
+    model.intervalTimeOfTransportType = [0 12 24];                          % [å…¬è·¯ é“è·¯ æ°´è·¯]ç­æ¬¡é—´éš”
+    model.rateDamagedOfRansportType = [0.3 0.2 0.1] / 100;                  % [å…¬è·¯ é“è·¯ æ°´è·¯]è¿è¾“è´§æŸç‡
+
+    % ä¸­è½¬å‚æ•°é¡ºåºï¼š[ä¸ä¸­è½¬, å…¬é“, å…¬æ°´, é“æ°´]
+    model.rateDamagedOfTransferType = [0.00 0.04 0.04 0.04] / 100;          % å•ä½ä¸­è½¬è´§æŸç‡
+    model.costOfUnitTransfer = [0 3.5 3 4];                                 % å•ä½ä¸­è½¬æˆæœ¬, å…ƒ/t
+    model.timeOfUnitTransfer = [0 0.01 0.015 0.01];                         % å•ä½ä¸­è½¬æ—¶é—´, h/t
+    model.carbonEmissionsOfUnitTransfer = [0 0.54 0.82 1.02];               % å•ä½ä¸­è½¬ç¢³æ’æ”¾, kg/t
+
+    model.price = 10000;                                                    % å•ä½è´§å€¼, å…ƒ/t
+    model.p1 = 8;                                                           % æå‰åˆ°è¾¾æƒ©ç½š, å…ƒ/(h*t)
+    model.p2 = 20;                                                          % å»¶è¯¯åˆ°è¾¾æƒ©ç½š, å…ƒ/(h*t)
+    model.carbonTax = 0.5;                                                  % ç»Ÿä¸€ç¢³ç¨, å…ƒ/kg
+    model.penaltyFactor = 10 ^ 10;                                          % Big-Mæƒ©ç½šç³»æ•°
+
+    model.numOfObjs = 2;                                                    % åŒç›®æ ‡ï¼š[åŠ æƒç»¼åˆç»æµæˆæœ¬, åŠ æƒæ€»ç¢³æ’æ”¾]
+    model.weightOfObjs = [0.5 0.5];                                         % å…¼å®¹å­—æ®µï¼ˆæœªå‚ä¸æœ¬æ¨¡å‹ç›®æ ‡ç»„è£…ï¼‰
+
+    model.numOfEdge = size(data, 1);
+    model.edgeSet = data(1: model.numOfEdge, 1: 2);
+    model.distanceTable = data(1: model.numOfEdge, 3: 5);
+    model.numOfVertex = max(model.edgeSet(:));
+    model.numOfTransportType = size(model.distanceTable, 2);
+
+    model.adjacencyMatrix = getAdjacencyMatrix(model.edgeSet);
+    [model.distanceMatOfAdjacency, ~] = floyd(model.adjacencyMatrix);
+    [model.distanceMat3D] = getDistanceMat3D(model.edgeSet, model.distanceTable);
+
     model.sequence = removeX(1: model.numOfVertex, model.startPointId);
-    model.numOfDecVariablesPart1 = length(model.sequence);                                  % ¾ö¶¨Â·Ïß
-    model.numOfDecVariablesPart2 = length(model.sequence);                                  % ¾ö¶¨ÔËÊä·½Ê½
-	model.numOfDecVariables = model.numOfDecVariablesPart1 + model.numOfDecVariablesPart2;	% ¾ö²ß±äÁ¿Î¬¶È
-    
-    model.lower2 = ones(1, model.numOfDecVariablesPart2);                                   % ¾ö²ß±äÁ¿ÏÂ½ç
-    model.upper2 = ones(1, model.numOfDecVariablesPart2) * model.numOfTransportType;        % ¾ö²ß±äÁ¿ÉÏ½ç
-    
-    model.initIndividual = @initIndividual;                                 % ³õÊ¼»¯¸öÌå
-    model.repairIndividual = @repairIndividual;                             % ĞŞ¸´¸öÌå
+    model.numOfDecVariablesPart1 = length(model.sequence);
+    model.numOfDecVariablesPart2 = length(model.sequence);
+    model.numOfDecVariables = model.numOfDecVariablesPart1 + model.numOfDecVariablesPart2;
+
+    model.lower2 = ones(1, model.numOfDecVariablesPart2);
+    model.upper2 = ones(1, model.numOfDecVariablesPart2) * model.numOfTransportType;
+
+    model.initIndividual = @initIndividual;
+    model.repairIndividual = @repairIndividual;
     model.analyseIndividual = @analyseIndividual;
-    model.getIndividualFitness = @getIndividualFitness;                     % ¼ÆËã¸öÌåÊÊÓ¦¶È
-    model.printIndividual = @printIndividual;                               % ´òÓ¡½á¹û
-    model.showIndividual = @showIndividual;                                 % ¸öÌå¿ÉÊÓ»¯
+    model.getIndividualFitness = @getIndividualFitness;
+    model.printIndividual = @printIndividual;
+    model.showIndividual = @showIndividual;
     model.getPathTransferType = @getPathTransferType;
     model.getDistanceOfPath = @getDistanceOfPath;
     model.getArriveTime = @getArriveTime;
     model.getIndividualObjs = @getIndividualObjs;
+    model.analyseIndividualUnderQ = @analyseIndividualUnderQ;
 end
 
 function [data] = updateData(data)
@@ -63,9 +71,8 @@ function [data] = updateData(data)
     data = data(I, :);
 end
 
-
 function [adjacencyMatrix] = getAdjacencyMatrix(edgeSet)
-    numOfVertex = max(edgeSet(:));                                          % ×Ü½ÚµãÊı
+    numOfVertex = max(edgeSet(:));
     adjacencyMatrix = Inf(numOfVertex, numOfVertex);
     for i = 1: numOfVertex
         adjacencyMatrix(i, i) = 0;
@@ -74,12 +81,11 @@ function [adjacencyMatrix] = getAdjacencyMatrix(edgeSet)
         id1 = edgeSet(i, 1);
         id2 = edgeSet(i, 2);
         adjacencyMatrix(id1, id2) = 1;
-        % adjacencyMatrix(id2, id1) = 1;
     end
 end
 
 function [distanceMat] = getDistanceMat(edgeSet, distanceArray)
-    numOfVertex = max(edgeSet(:));                                          % ×Ü½ÚµãÊı
+    numOfVertex = max(edgeSet(:));
     distanceMat = Inf(numOfVertex, numOfVertex);
     for i = 1: numOfVertex
         distanceMat(i, i) = 0;
@@ -88,13 +94,12 @@ function [distanceMat] = getDistanceMat(edgeSet, distanceArray)
         id1 = edgeSet(i, 1);
         id2 = edgeSet(i, 2);
         distanceMat(id1, id2) = distanceArray(i);
-        % distanceMat(id2, id1) = distanceArray(i);
     end
 end
 
 function [distanceMat3D] = getDistanceMat3D(edgeSet, distanceTable)
-    numOfVertex = max(edgeSet(:));                                          % ×Ü½ÚµãÊı
-    numOfTransportType = size(distanceTable, 2);                            % ÔËÊäÀàĞÍÊı
+    numOfVertex = max(edgeSet(:));
+    numOfTransportType = size(distanceTable, 2);
     distanceMat3D = zeros(numOfVertex, numOfVertex, numOfTransportType);
     for i = 1: numOfTransportType
         distanceArray = distanceTable(:, i);
@@ -108,8 +113,6 @@ function [newArray] = removeX(originalArray, elementToRemove)
     newArray(indexToRemove) = [];
 end
 
-
-%% ³õÊ¼»¯¸öÌå
 function [individualPart1] = initIndividualPart1(model)
     [sequence] = model.sequence;
     individualPart1 = sequence(randperm(length(sequence)));
@@ -120,8 +123,8 @@ function [individualPart2] = initIndividualPart2(model)
 end
 
 function [individual] = initIndividual(model)
-	[individualPart1] = initIndividualPart1(model);
-    [individualPart2] = initIndividualPart2(model);    
+    [individualPart1] = initIndividualPart1(model);
+    [individualPart2] = initIndividualPart2(model);
     individual = [individualPart1 individualPart2];
 end
 
@@ -130,7 +133,7 @@ function [path, typeOfPath] = analyseIndividual(individual, model)
     individualPart2 = individual(1 + model.numOfDecVariablesPart1: end);
 
     [individualPart2] = repairIndividualPart2(individualPart2, model);
-    
+
     path = getPath(individualPart1, model);
     typeOfPath = individualPart2(1: length(path) - 1);
 end
@@ -141,14 +144,14 @@ function [path] = getPath(individualPart1, model)
 end
 
 function [newIndividualPart2] = repairIndividualPart2(individualPart2, model)
-	newIndividualPart2 = individualPart2;
+    newIndividualPart2 = individualPart2;
     newIndividualPart2 = max(newIndividualPart2, model.lower2);
-	newIndividualPart2 = min(newIndividualPart2, model.upper2);
+    newIndividualPart2 = min(newIndividualPart2, model.upper2);
     newIndividualPart2 = round(newIndividualPart2);
 end
 
 function [distanceOfPath, distanceArray, numOfPenalty] = getDistanceOfPath(path, typeOfPath, model)
-    numOfRoute = length(path) - 1;                                          % Â·¾¶Êı
+    numOfRoute = length(path) - 1;
     distanceArray = zeros(1, numOfRoute);
     for i = 1: numOfRoute
         I = path(i);
@@ -156,22 +159,26 @@ function [distanceOfPath, distanceArray, numOfPenalty] = getDistanceOfPath(path,
         K = typeOfPath(i);
         distanceArray(i) = model.distanceMat3D(I, J, K);
     end
-    
+
     numOfPenalty = 0;
     J = find(distanceArray == inf, 1);
     if ~isempty(J)
         numOfPenalty = model.distanceMatOfAdjacency(path(J), path(end));
     end
-    
+
     I = distanceArray < inf;
     distanceOfPath = sum(distanceArray(I)) + numOfPenalty * model.penaltyFactor;
 end
 
-% Ã¿¸öµãµÄµ½´ïÊ±¼ä¡¢µÈ´ıÊ±¼ä
-function [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathTransferType, model)
-    travelTime = distanceArray ./ model.speedOfTransportType(typeOfPath);   % Ã¿¶ÎÂ·³ÌĞĞÊ»Ê±¼ä
-    arriveTime = zeros(1, length(distanceArray) + 1);                       % Ã¿¸öµãµÄµ½´ïÊ±¼ä
-    waitTime = zeros(1, length(distanceArray) + 1);                         % Ã¿¸öµãµÄµÈ´ıÊ±¼ä
+% æ¯ä¸ªèŠ‚ç‚¹åˆ°è¾¾æ—¶é—´ã€ç­‰å¾…æ—¶é—´ï¼ˆä¸­è½¬æ—¶é—´æ²¿ç”¨QÃ—timeOfUnitTransferåŸé€»è¾‘ï¼‰
+function [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathTransferType, model, Q)
+    if nargin < 5
+        Q = model.quantityOfCargo;
+    end
+
+    travelTime = distanceArray ./ model.speedOfTransportType(typeOfPath);
+    arriveTime = zeros(1, length(distanceArray) + 1);
+    waitTime = zeros(1, length(distanceArray) + 1);
 
     currentTime = 0;
     for i = 1: length(typeOfPath)
@@ -179,14 +186,14 @@ function [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathT
         startTimeOfTransport = model.startTimeOfTransportType(type);
         endTimeOfTransport = model.endTimeOfTransportType(type);
         intervalTimeOfTransport = model.intervalTimeOfTransportType(type);
-        [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);    % ×îÔç³ö·¢Ê±¼ä
+        [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOfTransport, intervalTimeOfTransport);
         waitTime(i) = startTime - currentTime;
-        arriveTime(i + 1) = startTime + travelTime(i);                      % ÏÂ¸öµãµÄµ½´ïÊ±¼ä
-        transferTime = 0;                                                   % ÖĞ×ªÊ±¼ä
+        arriveTime(i + 1) = startTime + travelTime(i);
+        transferTime = 0;
         if i > 1
-            transferTime = model.quantityOfCargo * model.timeOfUnitTransfer(pathTransferType(i - 1));
+            transferTime = Q * model.timeOfUnitTransfer(pathTransferType(i - 1));
         end
-        currentTime = arriveTime(i + 1) + transferTime;                     % µ±Ç°Ê±¼ä
+        currentTime = arriveTime(i + 1) + transferTime;
     end
 end
 
@@ -201,14 +208,14 @@ function [startTime] = getStartTime(currentTime, startTimeOfTransport, endTimeOf
         n = ceil((currentT - startTimeOfTransport) / intervalTimeOfTransport);
         startTime = startTimeOfTransport + n * intervalTimeOfTransport;
         if startTime > endTimeOfTransport
-           startTime = ceil(startTime / 24) * 24 + startTimeOfTransport;
+            startTime = ceil(startTime / 24) * 24 + startTimeOfTransport;
         end
     end
     awaitTime = startTime - currentT;
     startTime = awaitTime + currentTime;
 end
 
-% ×ªÔËÀàĞÍ£¬[²»ÖĞ×ª¡¢¹«Â·-ÌúÂ·¡¢¹«Â·-Ë®Â·¡¢ÌúÂ·-Ë®Â·]  [1 2 3 4]
+% è½¬è¿ç±»å‹ï¼š[ä¸ä¸­è½¬, å…¬é“, å…¬æ°´, é“æ°´]
 function [transferType] = getTransferType(id1, id2)
     transferType = 1;
     if id1 == 1 && id2 == 2 || id1 == 2 && id2 == 1
@@ -220,108 +227,182 @@ function [transferType] = getTransferType(id1, id2)
     end
 end
 
-% Â·Ïß×ªÔËĞÅÏ¢
 function [pathTransferType] = getPathTransferType(typeOfPath)
-    pathTransferType = zeros(1, length(typeOfPath) -1);
+    pathTransferType = zeros(1, length(typeOfPath) - 1);
     for i = 1: length(pathTransferType)
         pathTransferType(i) = getTransferType(typeOfPath(i), typeOfPath(i + 1));
     end
 end
-%%
-% µÈ´ı³É±¾Cost1
-function [Cost1] = getCost1(waitTime, typeOfPath, model)
-    Cost1 = sum(model.quantityOfCargo * waitTime(1: length(typeOfPath)) .* model.costOfUnitWait(typeOfPath));
+
+function [C_wait] = getCostWait(waitTime, typeOfPath, model, Q)
+    C_wait = sum(Q * waitTime(1: length(typeOfPath)) .* model.costOfUnitWait(typeOfPath));
 end
 
-% ÔËÊä³É±¾Cost2
-function [Cost2] = getCost2(distanceArray, typeOfPath, model)
-    Cost2 = sum(model.quantityOfCargo * distanceArray .* model.costOfUnitTransport(typeOfPath));
+function [C_trans] = getCostTransport(distanceArray, typeOfPath, model, Q)
+    C_trans = sum(Q * distanceArray .* model.costOfUnitTransport(typeOfPath));
 end
 
-% Ì¼ÅÅ·ÅÁ¿Cost3
-function [Cost3] = getCost3(distanceArray, typeOfPath, pathTransferType, model)
-    Cost31 = sum(model.quantityOfCargo * distanceArray .* model.carbonEmissionsOfUnitTransport(typeOfPath));    % ÔËÊäÌ¼ÅÅ·ÅÁ¿
-    Cost32 = sum(model.quantityOfCargo * model.carbonEmissionsOfUnitTransfer(pathTransferType));                % ÖĞ×ªÅÅ·ÅÁ¿
-%     Cost3 = (Cost31 + Cost32) * model.costOfUnitCarbon;
-    Cost3 = (Cost31 + Cost32);
+function [E_total] = getCarbonEmission(distanceArray, typeOfPath, pathTransferType, model, Q)
+    E_trans = sum(Q * distanceArray .* model.carbonEmissionsOfUnitTransport(typeOfPath));
+    E_transfer = sum(Q * model.carbonEmissionsOfUnitTransfer(pathTransferType));
+    E_total = E_trans + E_transfer;
 end
 
-% ÖĞ×ª³É±¾Cost4
-function [Cost4] = getCost4(pathTransferType, model)
-    Cost4 = sum(model.quantityOfCargo * model.costOfUnitTransfer(pathTransferType));
+function [C_transfer] = getCostTransfer(pathTransferType, model, Q)
+    C_transfer = sum(Q * model.costOfUnitTransfer(pathTransferType));
 end
 
-% Ê±¼ä´°³É±¾Cost5
-function [Cost5] = getCost5(arriveTime, model)
+function [C_timeWindow] = getCostTimeWindow(arriveTime, model, Q)
     T = arriveTime(end);
-    Cost5 = 0;
+    C_timeWindow = 0;
     if T < model.TW(1)
-        Cost5 = model.quantityOfCargo * model.p1 * (model.TW(1) - T);
+        C_timeWindow = Q * model.p1 * (model.TW(1) - T);
     elseif T > model.TW(2)
-        Cost5 = model.quantityOfCargo * model.p2 * (T - model.TW(2));
+        C_timeWindow = Q * model.p2 * (T - model.TW(2));
     end
 end
 
-% »õËğ³É±¾Cost6
-function [Cost6] = getCost6(typeOfPath, pathTransferType, model)
-    Cost61 = sum(model.quantityOfCargo * model.rateDamagedOfRansportType(typeOfPath));          % ÔËÊä·½Ê½µÄ»õËğ
-    Cost62 = sum(model.quantityOfCargo * model.rateDamagedOfTransferType(pathTransferType));	% ×ªÔË·½Ê½µÄ»õËğ
-    Cost6 = model.price * (Cost61 + Cost62);
+function [C_damage] = getCostDamage(typeOfPath, pathTransferType, model, Q)
+    C_damage_transport = sum(Q * model.rateDamagedOfRansportType(typeOfPath));
+    C_damage_transfer = sum(Q * model.rateDamagedOfTransferType(pathTransferType));
+    C_damage = model.price * (C_damage_transport + C_damage_transfer);
 end
 
-function [Cost1, Cost2, Cost3, Cost4, Cost5, Cost6, numOfPenalty, distanceOfPath, arriveTime] = getAllCost(individual, model)
+% å•ä¸€è´§é‡æƒ…æ™¯ä¸‹çš„å®Œæ•´è¯„ä¼°ä¸­é—´å±‚å‡½æ•°
+function [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTime, path, typeOfPath, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q)
     [path, typeOfPath] = model.analyseIndividual(individual, model);
     [distanceOfPath, distanceArray, numOfPenalty] = getDistanceOfPath(path, typeOfPath, model);
-    [pathTransferType] = model.getPathTransferType(typeOfPath);             % Â·Ïß×ªÔËĞÅÏ¢
-    [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathTransferType, model);
-    [Cost1] = getCost1(waitTime, typeOfPath, model);                        % µÈ´ı³É±¾Cost1
-    [Cost2] = getCost2(distanceArray, typeOfPath, model);                   % ÔËÊä³É±¾Cost2
-    [Cost3] = getCost3(distanceArray, typeOfPath, pathTransferType, model); % Ì¼ÅÅ·ÅÁ¿Cost3
-    [Cost4] = getCost4(pathTransferType, model);                            % ÖĞ×ª³É±¾Cost4
-    [Cost5] = getCost5(arriveTime, model);                                  % Ê±¼ä´°³É±¾Cost5
-    [Cost6] = getCost6(typeOfPath, pathTransferType, model);                % »õËğ³É±¾Cost6
+    [pathTransferType] = model.getPathTransferType(typeOfPath);
+    [arriveTime, waitTime] = getArriveTime(distanceArray, typeOfPath, pathTransferType, model, Q);
+
+    C_wait = getCostWait(waitTime, typeOfPath, model, Q);
+    C_trans = getCostTransport(distanceArray, typeOfPath, model, Q);
+    C_transfer = getCostTransfer(pathTransferType, model, Q);
+    C_timeWindow = getCostTimeWindow(arriveTime, model, Q);
+    C_damage = getCostDamage(typeOfPath, pathTransferType, model, Q);
+    E_total = getCarbonEmission(distanceArray, typeOfPath, pathTransferType, model, Q);
 end
 
-% ×îĞ¡»¯£ºÊ±¼ä¡¢³É±¾¡¢Ì¼ÅÅ·Å
+% åŒç›®æ ‡ï¼šåŠ æƒç»¼åˆç»æµæˆæœ¬ã€åŠ æƒæ€»ç¢³æ’æ”¾
 function [individualObjs] = getIndividualObjs(individual, model)
-    [Cost1, Cost2, Cost3, Cost4, Cost5, Cost6, numOfPenalty, distanceOfPath, arriveTime] = getAllCost(individual, model);
-    f1 = arriveTime(end);                                                   % Ê±¼ä
-    f2 = Cost1 + Cost2 + Cost4 + Cost6;                                     % ³É±¾
-    f3 = Cost3;                                                             % Ì¼ÅÅ·Å
-    individualObjs = [f1 f2 f3];
-    if numOfPenalty > 0
-        individualObjs = [0 0 0] + numOfPenalty * distanceOfPath;
+    scenarioQ = model.fuzzyQ;
+    scenarioW = model.fuzzyW;
+
+    scenarioCost = zeros(1, length(scenarioQ));
+    scenarioEmission = zeros(1, length(scenarioQ));
+
+    penaltyValue = model.penaltyFactor;
+    for i = 1: length(scenarioQ)
+        Q = scenarioQ(i);
+        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, ~, ~, ~, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
+
+        if numOfPenalty > 0 || any(~isfinite([C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total]))
+            individualObjs = [1 1] * (penaltyValue + abs(distanceOfPath));
+            return;
+        end
+
+        C_base = C_wait + C_trans + C_transfer + C_timeWindow + C_damage;
+        C_tax = model.carbonTax * E_total;
+        C_total = C_base + C_tax;
+
+        scenarioCost(i) = C_total;
+        scenarioEmission(i) = E_total;
     end
-    individualObjs = individualObjs(1: model.numOfObjs);
+
+    F_cost = sum(scenarioW .* scenarioCost);
+    F_carbon = sum(scenarioW .* scenarioEmission);
+
+    if any(~isfinite([F_cost, F_carbon]))
+        individualObjs = [1 1] * penaltyValue;
+        return;
+    end
+
+    individualObjs = [F_cost, F_carbon];
 end
 
 function printIndividual(individual, model)
-    [Cost1, Cost2, Cost3, Cost4, Cost5, Cost6, numOfPenalty, distanceOfPath, arriveTime] = getAllCost(individual, model);
-    individualFitness = - Cost1 - Cost2 - Cost3 - Cost4 - Cost5 - Cost6 - numOfPenalty * model.penaltyFactor;
-    fprintf('µÈ´ı³É±¾Cost1:%.2f ÔËÊä³É±¾Cost2:%.2f Ì¼ÅÅ·ÅÁ¿Cost3:%.2f ÖĞ×ª³É±¾Cost4:%.2f Ê±¼ä´°³É±¾Cost5:%.2f »õËğ³É±¾Cost6:%.2f Ä¿±êº¯Êı:%.2f\n', Cost1, Cost2, Cost3, Cost4, Cost5, Cost6, -individualFitness);
+    scenarioQ = model.fuzzyQ;
+    scenarioW = model.fuzzyW;
+
+    scenarioCost = zeros(1, length(scenarioQ));
+    scenarioEmission = zeros(1, length(scenarioQ));
+    scenarioArriveTime = zeros(1, length(scenarioQ));
+
+    hasPenalty = false;
+    for i = 1: length(scenarioQ)
+        Q = scenarioQ(i);
+        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTime, path, typeOfPath, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
+
+        if numOfPenalty > 0 || any(~isfinite([C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total]))
+            hasPenalty = true;
+            fprintf('ä¸ªä½“ä¸å¯è¡Œï¼Œè§¦å‘Big-Mæƒ©ç½šã€‚numOfPenalty=%d, distanceOfPath=%.2f\n', numOfPenalty, distanceOfPath);
+            break;
+        end
+
+        C_base = C_wait + C_trans + C_transfer + C_timeWindow + C_damage;
+        C_tax = model.carbonTax * E_total;
+        C_total = C_base + C_tax;
+
+        scenarioCost(i) = C_total;
+        scenarioEmission(i) = E_total;
+        scenarioArriveTime(i) = arriveTime(end);
+
+        fprintf('æƒ…æ™¯%d: Q=%.0f, W=%.2f, C_wait=%.2f, C_trans=%.2f, C_transfer=%.2f, C_timeWindow=%.2f, C_damage=%.2f, C_tax=%.2f, C_total=%.2f, E_total=%.2f, arriveTime=%.2f\n', ...
+            i, Q, scenarioW(i), C_wait, C_trans, C_transfer, C_timeWindow, C_damage, C_tax, C_total, E_total, arriveTime(end));
+    end
+
+    if hasPenalty
+        return;
+    end
+
     [individualObjs] = getIndividualObjs(individual, model);
-    fprintf('Ê±¼äF1:%.2f ³É±¾F2:%.2f Ì¼ÅÅ·ÅF3:%.2f\n', individualObjs(1), individualObjs(2), individualObjs(3));
+    fprintf('åŠ æƒç»¼åˆç»æµæˆæœ¬ F_cost: %.2f\n', individualObjs(1));
+    fprintf('åŠ æƒæ€»ç¢³æ’æ”¾é‡ F_carbon: %.2f\n', individualObjs(2));
+    fprintf('è·¯å¾„åºåˆ— path: %s\n', mat2str(path));
+    fprintf('è¿è¾“æ–¹å¼åºåˆ— typeOfPath: %s\n', mat2str(typeOfPath));
+    fprintf('å„æƒ…æ™¯åˆ°è¾¾æ—¶é—´: %s\n', mat2str(scenarioArriveTime, 6));
 end
 
-% ¼ÆËã¸öÌåÊÊÓ¦¶È
 function [individualFitness] = getIndividualFitness(individual, model)
-    [Cost1, Cost2, Cost3, Cost4, Cost5, Cost6, numOfPenalty, distanceOfPath, arriveTime] = getAllCost(individual, model);
-    individualFitness = - Cost1 - Cost2 - Cost3 - Cost4 - Cost5 - Cost6 - numOfPenalty * model.penaltyFactor;
-    if numOfPenalty > 0
-        individualFitness = - distanceOfPath;
+    [individualObjs] = getIndividualObjs(individual, model);
+    if any(~isfinite(individualObjs)) || any(individualObjs >= model.penaltyFactor)
+        individualFitness = -model.penaltyFactor;
+        return;
+    end
+
+    F_cost = individualObjs(1);
+    individualFitness = -F_cost;
+end
+
+function [newIndividual] = repairIndividual(individual, model)
+    individualPart1 = individual(1: model.numOfDecVariablesPart1);
+    individualPart2 = individual(model.numOfDecVariablesPart1 + 1: end);
+
+    [individualPart1] = repairIndividualPart1(individualPart1, model);
+    [individualPart2] = repairIndividualPart2(individualPart2, model);
+    newIndividual = [individualPart1 individualPart2];
+end
+
+function [newIndividualPart1] = repairIndividualPart1(individualPart1, model)
+    [~, IA] = unique(individualPart1, 'stable');
+    missSet = setdiff(model.sequence, individualPart1(IA), 'stable');
+    newIndividualPart1 = individualPart1;
+    dupId = setdiff(1: length(individualPart1), IA, 'stable');
+    if ~isempty(dupId)
+        fillLen = min(length(dupId), length(missSet));
+        newIndividualPart1(dupId(1: fillLen)) = missSet(1: fillLen);
     end
 end
 
-%% »æÍ¼
 function showIndividual(individual, model)
     [path, typeOfPath] = model.analyseIndividual(individual, model);
-    
+
     distanceTable = model.distanceTable;
     s = model.edgeSet(:, 1);
     t = model.edgeSet(:, 2);
     numOfEdge = length(s);
     numOfVertex = model.numOfVertex;
-    
+
     edgeLabel = cell(numOfEdge, 1);
     for i = 1: numOfEdge
         edgeLabel{i} = num2str(distanceTable(i, :), '%d,');
@@ -330,7 +411,7 @@ function showIndividual(individual, model)
     for i = 1: numOfVertex
         nodeLabel{i} = num2str(i);
     end
-    
+
     edgeColor = zeros(numOfEdge, 3);
 
     for i = 1: length(path) - 1
@@ -347,13 +428,10 @@ function showIndividual(individual, model)
             end
         end
     end
-    % G = graph(s, t);
+
     G = digraph(s, t);
-
-    plot(G,'NodeLabel',nodeLabel,'EdgeLabel',edgeLabel,'EdgeColor',edgeColor, 'LineWidth',2);
-    % plot(G,'NodeLabel',nodeLabel,'EdgeColor',edgeColor, 'LineWidth',2);
+    plot(G, 'NodeLabel', nodeLabel, 'EdgeLabel', edgeLabel, 'EdgeColor', edgeColor, 'LineWidth', 2);
 end
-
 
 
 
