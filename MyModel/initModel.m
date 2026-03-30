@@ -7,8 +7,10 @@ function [model] = initModel(fileName)
 
     % 货量设置：quantityOfCargo仅作为兼容字段/最可能货量展示值
     model.quantityOfCargo = 1000;                                           % 兼容字段（最可能货量）, t
-    model.fuzzyQ = [800 1000 1200];                                         % 三角模糊需求场景, t
-    model.fuzzyW = [0.25 0.50 0.25];                                        % 三场景权重
+    model.fuzzyQ = [800 1000 1200];                                           % 三角模糊需求端点 [L M U]
+    model.fuzzyW = [0.25 0.50 0.25];                                        % 兼容保留，不再作为主目标加权核心
+    model.lambdaFuzzyCost = 0.2;                                            % 模糊成本宽度惩罚系数
+    model.lambdaFuzzyCarbon = 0.2;                                          % 模糊排放宽度惩罚系数                                      
 
     model.TW = [60 100];                                                    % 时间窗, h
     model.costOfUnitWait = [2 1 0.2];                                       % [公路 铁路 水路]单位等待成本, 元/(h*t)
@@ -29,10 +31,10 @@ function [model] = initModel(fileName)
     model.price = 10000;                                                    % 单位货值, 元/t
     model.p1 = 8;                                                           % 提前到达惩罚, 元/(h*t)
     model.p2 = 20;                                                          % 延误到达惩罚, 元/(h*t)
-    model.carbonTax = 0.5;                                                  % 统一碳税, 元/kg
+    model.carbonTax = 0.05;                                                  % 统一碳税, 元/kg
     model.penaltyFactor = 10 ^ 10;                                          % Big-M惩罚系数
 
-    model.numOfObjs = 2;                                                    % 双目标：[加权综合经济成本, 加权总碳排放]
+    model.numOfObjs = 2;                                                    % 双目标：[模糊排序综合经济目标, 模糊排序总碳排放目标]
     model.weightOfObjs = [0.5 0.5];                                         % 兼容字段（未参与本模型目标组装）
 
     model.numOfEdge = size(data, 1);
@@ -373,10 +375,9 @@ function [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTi
     E_total = getCarbonEmission(distanceArray, typeOfPath, pathTransferType, model, Q);
 end
 
-% 双目标：加权综合经济成本、加权总碳排放
+% 双目标：全模糊排序综合经济目标、全模糊排序总碳排放目标
 function [individualObjs, detail] = getIndividualObjs(individual, model)
     scenarioQ = model.fuzzyQ;
-    scenarioW = model.fuzzyW;
 
     scenarioCost = zeros(1, length(scenarioQ));
     scenarioEmission = zeros(1, length(scenarioQ));
@@ -386,7 +387,6 @@ function [individualObjs, detail] = getIndividualObjs(individual, model)
 
     detail = struct();
     detail.scenarioQ = scenarioQ;
-    detail.scenarioW = scenarioW;
     detail.scenarioCost = [];
     detail.scenarioEmission = [];
     detail.scenarioArriveTime = [];
@@ -395,7 +395,9 @@ function [individualObjs, detail] = getIndividualObjs(individual, model)
 
     for i = 1:length(scenarioQ)
         Q = scenarioQ(i);
-        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTime, path, typeOfPath, numOfPenalty, distanceOfPath] = analyseIndividualUnderQ(individual, model, Q);
+
+        [C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total, arriveTime, path, typeOfPath, numOfPenalty, distanceOfPath] = ...
+            analyseIndividualUnderQ(individual, model, Q);
 
         if numOfPenalty > 0 || any(~isfinite([C_wait, C_trans, C_transfer, C_timeWindow, C_damage, E_total]))
             individualObjs = [1 1] * (penaltyValue + abs(distanceOfPath));
@@ -420,19 +422,45 @@ function [individualObjs, detail] = getIndividualObjs(individual, model)
         detail.typeOfPath = typeOfPath;
     end
 
-    F_cost = sum(scenarioW .* scenarioCost);
-    F_carbon = sum(scenarioW .* scenarioEmission);
+% 原始三情景结果
+% =========================
+C1 = scenarioCost(1);   C2 = scenarioCost(2);   C3 = scenarioCost(3);
+E1 = scenarioEmission(1); E2 = scenarioEmission(2); E3 = scenarioEmission(3);
 
-    if any(~isfinite([F_cost, F_carbon]))
-        individualObjs = [1 1] * penaltyValue;
-        return;
-    end
+% =========================
+% 单调化重构后的模糊三角目标
+% 目的：避免宽度为负，保证 L <= M <= U
+% =========================
+CL = min([C1, C2, C3]);
+CU = max([C1, C2, C3]);
+CM = min(max(C2, CL), CU);
 
-    individualObjs = [F_cost, F_carbon];
+EL = min([E1, E2, E3]);
+EU = max([E1, E2, E3]);
+EM = min(max(E2, EL), EU);
 
-    detail.scenarioCost = scenarioCost;
-    detail.scenarioEmission = scenarioEmission;
-    detail.scenarioArriveTime = scenarioArriveTime;
+% =========================
+% 排序求解：模糊期望 + 宽度惩罚
+% =========================
+F_cost = (CL + 2*CM + CU)/4 + model.lambdaFuzzyCost * (CU - CL);
+F_carbon = (EL + 2*EM + EU)/4 + model.lambdaFuzzyCarbon * (EU - EL);
+
+if any(~isfinite([F_cost, F_carbon]))
+    individualObjs = [1 1] * penaltyValue;
+    return;
+end
+
+individualObjs = [F_cost, F_carbon];
+
+detail.scenarioCost = scenarioCost;
+detail.scenarioEmission = scenarioEmission;
+detail.scenarioArriveTime = scenarioArriveTime;
+
+% 额外保存模糊三角目标，便于后面第五章导表
+detail.fuzzyCost = [CL, CM, CU];
+detail.fuzzyCarbon = [EL, EM, EU];
+detail.fuzzyCostWidth = CU - CL;
+detail.fuzzyCarbonWidth = EU - EL;
 end
 
 function traceTimeDetail(individual, model, Q)
@@ -492,7 +520,6 @@ end
 
 function printIndividual(individual, model)
     scenarioQ = model.fuzzyQ;
-    scenarioW = model.fuzzyW;
 
     scenarioCost = zeros(1, length(scenarioQ));
     scenarioEmission = zeros(1, length(scenarioQ));
@@ -527,10 +554,10 @@ function printIndividual(individual, model)
         scenarioEmission(i) = E_total;
         scenarioArriveTime(i) = arriveTime2(end);
 
-        fprintf(['情景%d: Q=%.0f, W=%.2f, C_wait=%.2f, C_trans=%.2f, C_transfer=%.2f, ', ...
+        fprintf(['情景%d: Q=%.0f, C_wait=%.2f, C_trans=%.2f, C_transfer=%.2f, ', ...
                  'C_timeWindow=%.2f, C_damage=%.2f, C_tax=%.2f, C_total=%.2f, E_total=%.2f, ', ...
                  'arriveTime=%.2f, travelTime=%.2f, waitTime=%.2f, transferTime=%.2f\n'], ...
-            i, Q, scenarioW(i), C_wait, C_trans, C_transfer, C_timeWindow, C_damage, C_tax, C_total, E_total, ...
+            i, Q, C_wait, C_trans, C_transfer, C_timeWindow, C_damage, C_tax, C_total, E_total, ...
             arriveTime2(end), totalTravelTime, totalWaitTime, totalTransferTime);
     end
 
@@ -538,13 +565,17 @@ function printIndividual(individual, model)
         return;
     end
 
-    [individualObjs] = getIndividualObjs(individual, model);
-    pathTransferType = model.getPathTransferType(typeOfPath);
-    numTransfers = sum(pathTransferType > 1);
-    numModeChanges = sum(typeOfPath(1:end-1) ~= typeOfPath(2:end));
+[individualObjs, detail] = getIndividualObjs(individual, model);
+pathTransferType = model.getPathTransferType(typeOfPath);
+numTransfers = sum(pathTransferType > 1);
+numModeChanges = sum(typeOfPath(1:end-1) ~= typeOfPath(2:end));
 
-    fprintf('加权综合经济成本 F_cost: %.2f\n', individualObjs(1));
-    fprintf('加权总碳排放量 F_carbon: %.2f\n', individualObjs(2));
+fprintf('模糊排序综合经济目标 F_cost*: %.2f\n', individualObjs(1));
+fprintf('模糊排序总碳排放目标 F_carbon*: %.2f\n', individualObjs(2));
+fprintf('模糊综合经济成本 [L M U]: %s\n', mat2str(detail.fuzzyCost, 6));
+fprintf('模糊总碳排放量 [L M U]: %s\n', mat2str(detail.fuzzyCarbon, 6));
+fprintf('模糊综合经济成本宽度: %.2f\n', detail.fuzzyCostWidth);
+fprintf('模糊总碳排放宽度: %.2f\n', detail.fuzzyCarbonWidth); 
     fprintf('路径序列 path: %s\n', mat2str(path));
     fprintf('运输方式序列 typeOfPath: %s\n', mat2str(typeOfPath));
     fprintf('中转类型 pathTransferType: %s\n', mat2str(pathTransferType));
@@ -670,6 +701,4 @@ function flag = isPathFeasible(path, model)
         end
     end
 end
-
-
 
