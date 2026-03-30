@@ -18,14 +18,16 @@ classdef myObj < PROBLEM
     methods
         %% Default settings of the problem
         function Setting(obj)
-            fileName = 'Copy_of_data04.txt';
-            [model] = initModel(fileName);
-            
+           % 通过 PlatEMO 参数机制接收碳税（单位：元/kg-CO2）
+            [carbonTax] = obj.ParameterSet(0.05);
+
+            fileName = 'wangluojiegou.txt';
+            model = initModel(fileName);
+            model.carbonTax = carbonTax;
+
             obj.model = model;
             obj.M = model.numOfObjs;
             obj.D = model.numOfDecVariables;
-%             obj.lower    = model.lower;
-%             obj.upper    = model.upper;
             obj.encoding = ones(1,obj.D) + 5;
         end
         %% Calculate objective values
