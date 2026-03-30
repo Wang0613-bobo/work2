@@ -1,7 +1,8 @@
 cd(fileparts(mfilename('fullpath')));
-addpath(genpath(cd));
+projectRoot = cd;
+addpath(genpath(projectRoot));
 
-N = 200;                  % 种群规模
+N = 100;                  % 种群规模
 saves = 200;              % 保存代数
 maxFE = N * 300;          % 最大评估次数
 
@@ -57,4 +58,5 @@ copyfile(srcFile, dstFile);
 
 fprintf('结果已归档到: %s\n', dstFile);
 end
+
 
